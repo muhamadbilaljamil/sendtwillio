@@ -97,6 +97,57 @@ function twilio_send_message($to, $message, $from="")
 }
 
 
+function sendOTP($user_id, $user_mobile, $user_email)
+{
+    $otp = rand(100000, 999999);
+
+    $user = get_user_by('email', $user_email);
+    if (!$user) {
+        wp_send_json_error(array('message' => 'User not found.'));
+        wp_die();
+    }
+
+    $otp_data = array(
+        'otp' => $otp,
+        'otp_status' => 0,
+        'expires' => time() + 300,
+        'mobile_number' => $user_mobile,
+        'mobile_verified' => false
+    );
+
+    // // Save all data as a single JSON object in user meta
+    update_user_meta($user_id, 'otp_data', json_encode($otp_data));
+
+    // // Integrate with SMS gateway to send OTP
+    // // Example: send_sms($user_mobile, $otp);
+    return $otp;
+    wp_die();
+}
+
+function verifyOTP($user_id, $user_mobile, $input_otp, $user_email)
+{
+    $user = get_user_by('email', $user_email);
+
+    if (!$user) {
+        wp_send_json_error(array('message' => 'User not found.'));
+        wp_die();
+    }
+    $otp_data_json = get_user_meta($user_id, 'otp_data', true);
+    $otp_data = json_decode($otp_data_json, true); 
+
+    if ($otp_data && $otp_data['otp'] == $input_otp && $otp_data['mobile_number'] == $user_mobile && time() < $otp_data['expires']) {
+        $otp_data['mobile_verified'] = true;
+        $otp_data['otp_status'] = $otp_data['otp_status'] + 1;
+        update_user_meta($user_id, 'otp_data', json_encode($otp_data));
+        wp_send_json_success(array('message' => 'OTP verified successfully.'));
+    } else {
+        wp_send_json_error(array('message' => 'Invalid or expired OTP.'));
+    }
+}
+
+
+
+
 /**
  * Builds the Twilio settings menus 
  * @since 0.1.0
